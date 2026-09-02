@@ -78,7 +78,7 @@
     }
 
     .chart-shell {
-      overflow-x: auto;
+      overflow: hidden;
       padding: 10px;
       background: var(--surface);
       border: 1px solid var(--border);
@@ -89,7 +89,7 @@
     svg {
       display: block;
       width: 100%;
-      min-width: 820px;
+      min-width: 0;
       height: auto;
       background: #fff;
     }
@@ -107,9 +107,11 @@
 
     @media (max-width: 700px) {
       main { width: min(100% - 16px, 1500px); margin: 8px auto; }
-      .controls { padding: 14px; }
+      .controls { gap: 14px; padding: 14px; }
       label { flex: 1 1 100%; min-width: 0; }
+      select { min-height: 52px; }
       .chart-shell { padding: 4px; }
+      .status { margin-inline: 2px; }
     }
   </style>
 </head>
@@ -175,6 +177,7 @@
     const regionSelect = document.getElementById("region-select");
     const geneSelect = document.getElementById("gene-select");
     const status = document.getElementById("status");
+    const mobileQuery = window.matchMedia("(max-width: 700px)");
 
     function svgElement(name, attributes = {}, text = "") {
       const element = document.createElementNS(SVG_NS, name);
@@ -206,12 +209,16 @@
       const entries = Object.entries(DATA.series[regionKey][gene]);
       const generations = DATA.generations;
       const total = DATA.expectedCandidates;
+      const isMobile = mobileQuery.matches;
 
       chart.replaceChildren();
 
-      const width = 1200;
-      const height = 700;
-      const margin = { top: 82, right: 250, bottom: 92, left: 105 };
+      const width = isMobile ? 620 : 1200;
+      const height = isMobile ? 920 : 700;
+      const margin = isMobile
+        ? { top: 82, right: 35, bottom: 330, left: 90 }
+        : { top: 82, right: 250, bottom: 92, left: 105 };
+      chart.setAttribute("viewBox", `0 0 ${width} ${height}`);
       const plotWidth = width - margin.left - margin.right;
       const plotHeight = height - margin.top - margin.bottom;
       const xMin = Math.min(...generations);
@@ -276,34 +283,40 @@
       addText(
         chart,
         margin.left + plotWidth / 2,
-        height - 22,
+        y(0) + 78,
         "Generation",
         "main-text",
         "middle"
       );
       addText(
         chart,
-        33,
+        isMobile ? 28 : 33,
         margin.top + plotHeight / 2,
         "Number of candidates",
         "main-text",
         "middle",
-        { transform: `rotate(-90 33 ${margin.top + plotHeight / 2})` }
+        {
+          transform: `rotate(-90 ${isMobile ? 28 : 33} ${margin.top + plotHeight / 2})`
+        }
       );
 
-      const legendX = margin.left + plotWidth + 50;
-      addText(chart, legendX, margin.top + 10, LEGEND_TITLES[gene], "main-text");
+      const legendX = isMobile ? margin.left : margin.left + plotWidth + 50;
+      const legendTitleY = isMobile ? y(0) + 135 : margin.top + 10;
+      addText(chart, legendX, legendTitleY, LEGEND_TITLES[gene], "main-text");
       entries.forEach(([label], index) => {
-        const itemY = margin.top + 60 + index * 64;
+        const column = isMobile ? index % 2 : 0;
+        const row = isMobile ? Math.floor(index / 2) : index;
+        const itemX = legendX + column * 255;
+        const itemY = legendTitleY + 54 + row * 64;
         chart.appendChild(svgElement("rect", {
-          x: legendX,
+          x: itemX,
           y: itemY - 24,
-          width: 58,
+          width: isMobile ? 48 : 58,
           height: 34,
           rx: 3,
           fill: COLORS[index]
         }));
-        addText(chart, legendX + 76, itemY + 3, label, "small-text");
+        addText(chart, itemX + (isMobile ? 62 : 76), itemY + 3, label, "small-text");
       });
 
       status.textContent = `${selectedDataset.label} · ${title} · ${generations.length} generations · ${total} candidates per generation`;
@@ -312,6 +325,14 @@
     datasetSelect.addEventListener("change", renderChart);
     regionSelect.addEventListener("change", renderChart);
     geneSelect.addEventListener("change", renderChart);
+    let resizeFrame = null;
+    window.addEventListener("resize", () => {
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = null;
+        renderChart();
+      });
+    });
     renderChart();
   </script>
 </body>
